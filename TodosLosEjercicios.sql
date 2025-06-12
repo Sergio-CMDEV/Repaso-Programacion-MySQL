@@ -587,7 +587,7 @@ END$$
 DELIMITER ;
 CALL promocionTurismo('Europe');
 
-/* EXAMEN */
+/* REPASO PARA EL EXAMEN */
 
 /* Hacer una función que retorne la suma de los términos 1/n  con “n” entre 1 y “m”, es decir 1+½+1/3+….1/m, 
 siendo  “m” el parámetro de entrada. Tener  en cuenta que  “m”  no puede ser cero. */
@@ -677,3 +677,207 @@ BEGIN
 END $$
 
 
+/* Ejercicios del examen */
+
+-- Ejercicio 1: Función sumatorioEnRango - Suma entre n y m
+
+/* Genera una función llamada sumatorioEnRango, que reciba 2 números enteros, n, m, y devuelva la suma de los números 
+entre n y m (ambos inclusive). Casos de prueba y salida esperada:
+
+- Si n, m y d son enteros positivos y n<m. Se realizará el cálculo comentado. Por ejemplo, si se llama con n=3, m=8, se 
+devolverá 33. 4 puntos
+- Si n, m o d son negativos o cero. La función devolverá cero directamente. 0,25 puntos.
+- Si n o m son nulos. La función devolverá null directamente. 0,25 puntos.
+- Si n es mayor a m, se intercambiarán para poder hacer el cálculo correctamente. La salida será la misma que en el 
+primer caso. 0,5 puntos.
+
+Aporta el código del CREATE FUNCTION/PROCEDURE junto con las llamadas que sean necesarias para cubrir los casos de 
+prueba definidas en cada ejercicio */
+
+DELIMITER $$
+
+DROP FUNCTION IF EXISTS sumatorioEnRango $$
+
+CREATE FUNCTION sumatorioEnRango(n INT, m INT)
+RETURNS INT 
+NOT DETERMINISTIC 
+NO SQL 
+BEGIN 
+    DECLARE vResultado INT DEFAULT 0; 
+    DECLARE vTemporal INT DEFAULT 0; 
+
+    IF n > 0 AND m > 0 THEN 
+        IF n > m THEN 
+            SET vTemporal = n; 
+            SET n = m; 
+            SET m = vtemporal; 
+        END IF; 
+
+        WHILE n < m DO 
+            SET vResultado = vResultado + n; 
+            SET n = n + 1; 
+        END WHILE; 
+
+    ELSEIF n <= 0 OR n <= 0 THEN 
+        RETURN (0); 
+
+    ELSEIF n IS NULL OR m IS NULL THEN 
+        RETURN NULL; 
+    END IF; 
+
+    RETURN vResultado; 
+END $$
+
+DELIMITER ;
+
+-- Llamadas de prueba
+SELECT sumatorioEnRango(2,8);
+SELECT sumatorioEnRango(NULL,8);
+SELECT sumatorioEnRango(-3,8);
+
+-- Ejercicio 2: Procedimiento ejemplaresInventario - Cambiar tienda de inventario por película
+
+/* Desarrolla un procedimiento que obtenga los ejemplares (inventory) en función de un id de película. 
+También entrará como parámetro un ID de tienda. Para cada inventario, actualiza la tienda en la que está, 
+cambiando la de 1 a 2 o de 2 a 1:
+
+Si el ejemplar está ya en la tienda en la que se pasa como parámetro, no se hace nada.
+Si el ejemplar no está en esa tienda, se cambiará a la tienda que se pasa por parámetro.
+Tras revisar todos los inventarios, se inserta un registro en infoCalculada, con la siguiente información. 
+Característica = “CambioTiendas”, Observaciones: “Se han cambiado <X> películas a la tienda <parámetro tienda>. 
+<Y> películas ya estaban en la tienda.”.
+
+
+Calificación:
+
+Estructura básica del procedimiento con cursor. 2 puntos.
+
+Consulta del cursor correcta. 1 punto.
+Recuperación de información correcta. 1 punto.
+Lógica actualizaciones. 3 puntos.
+Lógica inserción final. 2,5 puntos.
+Llamadas al procedimiento. 0,5 puntos. */
+
+DELIMITER $$
+
+DROP PROCEDURE IF EXISTS ejemplaresInventario $$
+
+CREATE PROCEDURE ejemplaresInventario (IN idPelicula INT, IN idTienda INT) 
+BEGIN 
+    DECLARE vIdPelicula INT; 
+    DECLARE vIdTienda INT; 
+    DECLARE vCaracteristica VARCHAR(50); 
+    DECLARE vObservacion VARCHAR(200); 
+    DECLARE finDatos BOOLEAN DEFAULT FALSE; 
+    DECLARE contador INT DEFAULT 0; 
+    DECLARE contador2 INT DEFAULT 0; 
+
+    DECLARE micursor CURSOR FOR 
+        SELECT film_id, store_id 
+        FROM inventory 
+        WHERE film_id = idPelicula AND store_id = idTienda; 
+
+    DECLARE CONTINUE HANDLER FOR NOT FOUND SET finDatos = TRUE; 
+
+    OPEN micursor; 
+
+    leerBucle: LOOP 
+        FETCH micursor INTO vIdPelicula, vIdTienda; 
+        IF finDatos = TRUE THEN 
+            LEAVE leerBucle; 
+        END IF; 
+
+        IF vIdTienda = 1 THEN 
+            IF vIdTienda = 2 THEN 
+                UPDATE inventory SET store_id = 1 WHERE vIdTienda = 2; 
+                SET contador = contador + 1; 
+            ELSEIF vIdtienda = 2 THEN 
+                IF vIdTienda = 1 THEN 
+                    UPDATE inventory SET store_id = 2 WHERE vIdTienda = 1; 
+                    SET contador = contador + 1; 
+                    /* acabo de entenderlo pero tarde, seria añadir otro parametro de que añada un contador a los que ya tenian la misma id */ 
+                ENDIF; 
+            END IF; 
+        END IF; 
+    END LOOP; 
+
+    SET vCaracteristica = CONCAT('Se han cambiado ', contador, ' peliculas a la tienda ', vIdTienda, '. ', contador2, + ' peliculas ya estaban en la tienda.'); 
+    INSET INTO infoCalculada (caracteristica, observaciones) VALUES (vCaracteristica, vObservaciones); 
+
+    CLOSE micursor; 
+END $$
+
+DELIMITER ;
+
+-- Llamadas de prueba
+CALL ejemplaresInventario(34,2);
+CALL ejemplaresInventario(27,1);
+
+-- Ejercicio 3: Función infoPago - Devuelve información de un pago
+
+/* Crea una función llamada infoPago que reciba un payment_id y devuelva una cadena con el nombre completo del cliente, 
+fechas de alquiler y devolución, y precio. Casos de prueba y salidas esperadas:
+
+- Si el pago existe y tiene asociado un alquiler, se mostrará “El cliente <nombre> <apellidos> ha pagado <importePago> en 
+un alquiler desde el <fecha_alquiler> hasta <fechaDevolucion>. 3 puntos.
+- Si el pago existe pero no tiene asociado un alquiler (nulo), se mostrará “El cliente <nombre> <apellidos> ha pagado 
+<importePago>.”. 1 punto.
+- Si el pago no existe, se mostrará “No existe el pago con id <id>” . 0,5 puntos.
+- Si el payment_id de entrada es nulo, no se realizará ninguna consulta, y se mostrará “Hay que informar el ID”. 0,5 puntos.
+
+Aporta el código del CREATE FUNCTION/PROCEDURE junto con las llamadas que sean necesarias para cubrir los casos de prueba 
+definidas en cada ejercicio */
+
+DELIMITER $$
+
+DROP FUNCTION IF EXISTS infoPago $$
+
+CREATE FUNCTION infoPago (IN paymentId INT) RETURNS VARCHAR(255) NOT DETERMINISTIC READS SQL DATA 
+BEGIN 
+    DECLARE vResultado VARCHAR(255); 
+    DECLARE vNombre VARCHAR(25); 
+    DECLARE vApellido VARCHAR(50); 
+    DECLARE vRental DATE; 
+    DECLARE vReturn DATE; 
+    DECLARE vPaymentId INT; 
+    DECLARE vAmount DECIMAL(10,2); 
+    
+    /* 
+    SELECT cu.first_name, cu.last_name, re.rental_date, re.return_date, pa.amount 
+    INTO vNombre, vApellido, vRental, vReturn, vAmount 
+    FROM payment pa 
+    INNER JOIN customer cu FOR cu.customer_id = pa.customer_id 
+    INNER JOIN rental re FOR re.rental_id = pa.rental_id 
+    WHERE payment_id = paymentId 
+    */ 
+
+    SELECT first_name, last_name 
+    INTO vNombre, vApellido 
+    FROM customer 
+    WHERE customer_id IN (SELECT customer_id FROM payment WHERE payment_id = paymentId); 
+
+    SELECT rental_date, renturn_date 
+    INTO vRental, vReturn 
+    FROM rental 
+    WHERE rental_id IN (SELECT rental_id FROM payment WHERE payment_id = paymentId); 
+
+    SELECT amount, payment_id 
+    INTO vAmount, vPaymentId 
+    FROM payment 
+    WHERE payment_id = paymentId; 
+
+    IF vAmount IS NOT NULL AND vPaymentId IS NOT NULL THEN 
+        SET vResultado = CONCAT('El cliente ' vNombre, ' ', vApellido ' ha pagado ', vAmount, ' en un alquiler desde el ', vRental, ' hasta ', vReturn); 
+    ELSEIF vAmount IS NOT NULL AND vPaymentId IS NULL THEN 
+        SET vResultado = CONCAT('El cliente ', vNombre, ' ', vApellido, ' ha pagado ', vAmount); 
+    ELSEIF vAmount IS NULL THEN 
+        SET vResultado = CONCAT('No existe el pago con id ', vPaymentId); 
+    ELSEIF vPaymentId IS NULL THEN 
+        RETURN ('Hay que informar el ID'); 
+    RETURN vResultado; 
+END $$
+
+DELIMITER ;
+
+-- Llamadas de prueba
+SELECT infoPago(5);
