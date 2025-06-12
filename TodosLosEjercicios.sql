@@ -592,6 +592,25 @@ CALL promocionTurismo('Europe');
 /* Hacer una función que retorne la suma de los términos 1/n  con “n” entre 1 y “m”, es decir 1+½+1/3+….1/m, 
 siendo  “m” el parámetro de entrada. Tener  en cuenta que  “m”  no puede ser cero. */
 
+/* Hacer una función que retorne la suma de los términos 1/n  con “n” entre 1 y “m”, es decir 1+½+1/3+….1/m, 
+siendo  “m” el parámetro de entrada. Tener  en cuenta que  “m”  no puede ser cero. */
+DELIMITER $$
+DROP FUNCTION IF EXISTS sumaTerminos $$
+CREATE FUNCTION sumaTerminos(vNumero INT)
+RETURNS DOUBLE
+DETERMINISTIC NO SQL
+BEGIN
+	DECLARE vN2 INT DEFAULT 1;
+    DECLARE vResultado DOUBLE DEFAULT 0;
+    
+    WHILE vN2 <= vNumero DO 
+        SET vResultado = 1/vN2 + vResultado;
+        SET vN2 = vN2 + 1;
+    END WHILE;
+END $$
+DELIMITER ;
+SELECT sumaTerminos(9);
+
 /* 6. Procedimiento subidaImpuestos
 Descripción:
 A partir del nombre de un continente recibido como parámetro, el procedimiento actualizará el campo GNP 
@@ -607,4 +626,54 @@ Se insertará en infoCalculada una fila con la característica SubidaImpuestos, 
 de países a los que se les ha subido. En observaciones incluye el número de países a los que se les ha reducido.
 
 Objetivo: Uso de cursor para recorrer países por continente y modificar datos numéricos con condicionales. */
+
+DELIMITER $$
+DROP PROCEDURE IF EXISTS subidaImpuestos $$
+CREATE PROCEDURE subidaImpuestos(IN nombreContinente VARCHAR(50))
+BEGIN
+	DECLARE vGNP DOUBLE;
+    DECLARE vContinente VARCHAR(50);
+    DECLARE vGNPOLD DOUBLE;
+    DECLARE vCuantitativo INT DEFAULT 0;
+    DECLARE vObservacion INT DEFAULT 0;
+    DECLARE vCaracteristica VARCHAR(100);
+    DECLARE finDatos BOOLEAN DEFAULT FALSE;
+    
+    DECLARE micursor CURSOR FOR
+    	SELECT continent, gnp
+        FROM country
+        WHERE continent = nombreContinente;
+    DECLARE CONTINUE HANDLER FOR NOT FOUND SET finDatos = TRUE;
+    
+    OPEN micursor;
+    leerBucle: LOOP
+    	FETCH micursor INTO vContinente, vGNP;
+        IF finDatos = TRUE THEN
+        	LEAVE leerBucle;
+        END IF;
+        
+        IF vGNP > 500000 THEN
+        	vGNP = vGNPOLD;
+            SET vCaracteristica = ('Impuesto por ajuste fiscal');
+        	UPDATE country SET gnp = gnp * 0.95 WHERE name = vContinente;
+            SET vObservacion = vObservacion + 1;
+        ELSEIF vGNP BETWEEN 100000 AND 500000 THEN
+        	vGNP = vGNPOLD;
+            SET vCaracteristica = ('Impuestos básicos');
+        	UPDATE country SET gnp = gnp * 0.98 WHERE name = vContinente;
+            SET vObservacion = vObservacion + 1;
+        ELSEIF vGNP < 100000 THEN
+        	vGNP = vGNPOLD;
+            SET vCaracteristica = ('Incentivos Economicos');
+        	UPDATE country SET gnp = gnp * 1.03 WHERE name = vContinente;
+            SET vCuantitativo = vCuantitativo + 1;
+        END IF;
+        END LOOP;
+        
+         INSERT INTO infoCalculada (característica, cuantitativo, observaciones) 
+        VALUES (vCaracteristica, CONCAT('Número de paises aumentados: ',vCuantitativo), CONCAT('Número de paises reducidos: ', vObservacion));
+        
+    CLOSE micursor;
+END $$
+
 
